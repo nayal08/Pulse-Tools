@@ -1,0 +1,5 @@
+ERROR_INVALID_LOGIN="Invalid Email/Password. Please try again."
+ERROR_USER_EXISTS = "Error! User already exists."
+EMPTY_REDIS="Data not found!"
+ERROR_MSG_USER_NOT_EXISTS = "Error! User does not exists."
+ERROR_MSG_FORGOT_PASSWORD="Error! Forgot password error."
