@@ -5,7 +5,7 @@ from enum import unique
 from operator import index
 from sqlite3 import Timestamp
 from unicodedata import name
-from numpy import unicode_
+from xmlrpc.client import boolean
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, TIMESTAMP, DECIMAL, Date, BIGINT, Enum
 from sqlalchemy.sql import func
 from sqlalchemy.sql.sqltypes import Float, LargeBinary
@@ -21,9 +21,7 @@ class Influencers(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     full_name=Column(String,default=None,unique=True,index=True)
-    email=Column(String,default=None,unique=True,index=True)
-    upvotes=Column(Integer,default=None)
-    downvotes=Column(Integer,default=None)
+    email=Column(String,default=None,index=True)
     rating=Column(Integer,default=None)
     youtube_link=Column(String,default=None)
     bio=Column(String,default=None)
@@ -55,8 +53,8 @@ class Reactions(Base):
     update_ts=Column(TIMESTAMP, onupdate=func.now())
 
 class Achievements(Base):
-    __tablename__="achivements"
-    id = Column(Integer, primary_key=True)
+    __tablename__="achievements"
+    id = Column(Integer, primary_key=True, autoincrement=True)
     influencer_id=Column(Integer,ForeignKey(Influencers.id))
     founder=Column(String, default=None)
     investor=Column(String, default=None)
@@ -64,4 +62,11 @@ class Achievements(Base):
     influencer=Column(String, default=None)
     update_ts=Column(TIMESTAMP, onupdate=func.now())
 
+class Votes(Base):
+    __tablename__="votes"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    influencers_id=Column(Integer,ForeignKey(Influencers.id))
+    upvotes=Column(Integer,default=0)
+    downvotes=Column(Integer,default=0)
+    
 
