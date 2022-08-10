@@ -5,10 +5,8 @@ from enum import unique
 from operator import index
 from sqlite3 import Timestamp
 from unicodedata import name
-from xmlrpc.client import boolean
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, TIMESTAMP, DECIMAL, Date, BIGINT, Enum
 from sqlalchemy.sql import func
-from sqlalchemy.sql.sqltypes import Float, LargeBinary
 
 
 from .database import Base
@@ -62,11 +60,19 @@ class Achievements(Base):
     influencer=Column(String, default=None)
     update_ts=Column(TIMESTAMP, onupdate=func.now())
 
-class Votes(Base):
-    __tablename__="votes"
+class DeviceId(Base):
+    __tablename__="deviceids"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    influencers_id=Column(Integer,ForeignKey(Influencers.id))
-    upvotes=Column(Integer,default=0)
-    downvotes=Column(Integer,default=0)
+    influencer_id=Column(Integer,ForeignKey(Influencers.id))
+    device_id = Column(String, default=None, unique=True)
+    up=Column(Boolean,default="False")
+    down=Column(Boolean,default="False")
+
+
+
+
+
+
+
     
 

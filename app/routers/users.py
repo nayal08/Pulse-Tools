@@ -1,6 +1,7 @@
 # from curses import flash
 from __future__ import with_statement
 from email import message
+from sqlalchemy.sql import func
 from turtle import update
 from urllib import response
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -14,10 +15,9 @@ from fastapi.security import OAuth2PasswordBearer
 from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta
 from fastapi.encoders import jsonable_encoder
+import pandas as pd
 import redis
 import os
-import random
-import string
 import json
 import sys
 from app.schemas import * 
@@ -36,8 +36,6 @@ async def createinfluencer(influencer:schemas.InfluencerCreate,db:Session=Depend
         if influencer_ratings<=10:
             dbcreateinfluencer=Influencers(full_name=influencer.full_name,email=influencer.email,
                 youtube_link=influencer.youtube_link,bio=influencer.bio,rating=influencer.rating)
-            # add_ts = created_at,
-            # update_ts = created_at)
             db.add(dbcreateinfluencer)
             db.commit()
             return jsonify_res(success=True,message="Created successfully")
@@ -197,38 +195,41 @@ async def getsociallinks(influencer_id:int,db:Session=Depends(get_db)):
         return jsonify_res(success=False, message="no achievements available with given id")
 
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Votes >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 @router.post("/create-votes")
-async def createvotes(influencer:schemas.VotesCreate,db: Session = Depends(get_db)):
-    try:
-        check_influencer = db.query(Influencers).filter(Influencers.id == influencer.influencer_id).first()
-        influencer_upvotes=influencer.upvotes,
-        influencer_downvotes=influencer.downvotes,
-        
-        if check_influencer:
-            dbvotes=Votes(
-                influencer_id=influencer.influencer_id,
-                influencer_upvotes=influencer.upvotes,
-                influencer_downvotes=influencer.downvotes)
-            db.add(dbvotes)
-            db.commit()
-            return jsonify_res(success=True,message="Votes submitted successfully")
-        return jsonify_res(success=True,message="No valid influencer id")
-    except:
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        print(exc_type, fname, exc_obj, exc_tb.tb_lineno)
-        
-
-
-@router.get("/votes")
-async def votes(influencer_id:int,db:Session=Depends(get_db)):
-    influencer_votes=db.query(Votes).filter(Votes.Influencers_id==influencer_id).first()
-    if influencer_votes:
-        votes_data=jsonable_encoder(influencer_votes)
-        return jsonify_res(success=True,message=votes_data)
-    return jsonify_res(success=False,message="no votes available for the given id")
-
-
+async def createvotes(votes: schemas.DeviseIdCreate, db: Session = Depends(get_db)):
+    check_device = db.query(DeviceId).filter(DeviceId.device_id == votes.device_id).first()
+    if check_device:
+        data={}
+        updatedata={DeviceId.up:votes.up,DeviceId.down:votes.down}
+        db.query(DeviceId).filter(DeviceId.device_id==votes.device_id,DeviceId.influencer_id==votes.influencer_id).update(updatedata)
+        db.commit()
+        updata = db.query(DeviceId).filter(DeviceId.influencer_id == votes.influencer_id,DeviceId.up==True).count()
+        downdata = db.query(DeviceId).filter(DeviceId.influencer_id == votes.influencer_id, DeviceId.down == True).countwcount()
+        data["updata"]=updata
+        data["downdata"]=downdata
+        data["up"]=votes.up
+        data["down"]=votes.down
+        print(data)
+        return data,"Device id already present"
+    else:
+        dbdevideid = DeviceId(
+        influencer_id=votes.influencer_id,
+        device_id=votes.device_id,
+        up=votes.up,
+        down=votes.down)
+        db.add(dbdevideid)
+        db.commit()
+        data={}
+        updata = db.query(DeviceId).filter(DeviceId.influencer_id ==
+                                       votes.influencer_id, DeviceId.up == True).count()
+        downdata = db.query(DeviceId).filter(
+            DeviceId.influencer_id == votes.influencer_id, DeviceId.down == True).count()
+        data["updata"] = updata
+        data["downdata"] = downdata
+        data["up"] = votes.up
+        data["down"] = votes.down
+        return data
 
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Details -------> influencer,socialmedia,achievements >>>>>>>>>>>>>>>>>>>
 
@@ -249,17 +250,22 @@ async def profile(influencer_id: int, db: Session = Depends(get_db)):
     else:
         return jsonify_res(success=False, message="No profile with given id")
 
-
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Community Ranking >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 @router.get("/community-ranking")
 async def related(db: Session = Depends(get_db)):
-    new_related = q = db.query(Achievements, Influencers, Votes).with_entities(Influencers.id, Influencers.full_name, Achievements.founder, Achievements.influencer, Achievements.investor,Achievements.whale, Votes.upvotes, Votes.downvotes).filter(Achievements.influencer_id == Influencers.id).filter(Achievements.influencer_id == Votes.influencers_id).all()
-    new_related = jsonable_encoder(new_related)
-    return new_related
-
-
-
-# @router.get("/Community-ranking")
-# async def communityranking()
+    # res = {}
+    res="""
+    SELECT i.full_name,a.founder,a.investor,a.whale,a.influencer,
+    SUM(case when up then 1 else 0 END) as up,SUM(case when down then 1 else 0 END) as down
+    FROM influencers i
+    inner join achievements as a ON a.influencer_id=i.id 
+    inner join deviceids ON deviceids.influencer_id=i.id 
+    WHERE a.influencer_id=i.id 
+    GROUP BY i.full_name,a.founder,a.investor,a.whale,a.influencer;
+    """
+    df = pd.read_sql(res, engine)
+    data = df.to_dict(orient='index')
+    return jsonify_res(success=True,message=data)
 
 
 

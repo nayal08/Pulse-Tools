@@ -1,6 +1,4 @@
 from typing import Optional
-from datetime import datetime
-from app.models import Influencers
 from pydantic import BaseModel, Field, EmailStr
 
 ##############################################################################################################
@@ -43,8 +41,9 @@ class AchievementsCreate(BaseModel):
     whale:Optional[str]
     influencer:Optional[str]
 
-class VotesCreate(BaseModel):
+class DeviseIdCreate(BaseModel):
     influencer_id:int
-    upvotes:Optional[bool]
-    downvotes:Optional[bool]
-    
+    device_id:str
+    up:bool
+    down:bool
+
