@@ -11,7 +11,7 @@ class InfluencerCreate(BaseModel):
     rating:Optional[int]
 
 class UpdateInfluencer(BaseModel):
-    influencer_id:int
+    slug:str
     email:Optional[EmailStr]
     youtube_link:Optional[str]
     bio:Optional[str]
@@ -19,7 +19,7 @@ class UpdateInfluencer(BaseModel):
 
 
 class SocialMediaCreate(BaseModel):
-    influencer_id:int
+    slug:str
     website:Optional[str]
     telegram:Optional[str]
     twitter:Optional[str]
@@ -28,21 +28,22 @@ class SocialMediaCreate(BaseModel):
     discord:Optional[str]
 
 class ReactionCreate(BaseModel):
-    influencer_id:int
-    super_duper:Optional[int]
-    smiley:Optional[int]
-    heart:Optional[int]
-    dislike:Optional[int]
+    slug:str
+    device_id: str
+    super_duper:bool
+    smiley:bool
+    heart:bool
+    dislike:bool
 
 class AchievementsCreate(BaseModel):
-    influencer_id:int
-    founder:Optional[str]
-    investor:Optional[str]
-    whale:Optional[str]
-    influencer:Optional[str]
+    slug: str
+    founder: bool
+    investor: bool
+    whale:bool
+    influencer:bool
 
-class DeviseIdCreate(BaseModel):
-    influencer_id:int
+class VotesCreate(BaseModel):
+    slug: str
     device_id:str
     up:bool
     down:bool

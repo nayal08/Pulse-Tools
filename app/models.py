@@ -7,6 +7,7 @@ from sqlite3 import Timestamp
 from unicodedata import name
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, TIMESTAMP, DECIMAL, Date, BIGINT, Enum
 from sqlalchemy.sql import func
+from fastapi_utils.guid_type import GUID
 
 
 from .database import Base
@@ -18,6 +19,7 @@ class Influencers(Base):
     __tablename__ ="influencers"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    slug=Column(String,unique=True,index=True)
     full_name=Column(String,default=None,unique=True,index=True)
     email=Column(String,default=None,index=True)
     rating=Column(Integer,default=None)
@@ -43,30 +45,31 @@ class SocialLinks(Base):
 class Reactions(Base):
     __tablename__="reactions"
     id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(String, default=None, unique=True)
     influencer_id=Column(Integer,ForeignKey(Influencers.id))
-    super_duper=Column(Integer,default=0)
-    smiley=Column(Integer,default=0)
-    heart=Column(Integer,default=0)
-    dislike=Column(Integer,default=0)
+    super_duper=Column(Boolean,default=False)
+    smiley=Column(Boolean,default=False)
+    heart=Column(Boolean,default=False)
+    dislike=Column(Boolean,default=False)
     update_ts=Column(TIMESTAMP, onupdate=func.now())
 
 class Achievements(Base):
     __tablename__="achievements"
     id = Column(Integer, primary_key=True, autoincrement=True)
     influencer_id=Column(Integer,ForeignKey(Influencers.id))
-    founder=Column(String, default=None)
-    investor=Column(String, default=None)
-    whale=Column(String, default=None)
-    influencer=Column(String, default=None)
+    founder=Column(Boolean, default=False)
+    investor=Column(Boolean, default=False)
+    whale = Column(Boolean, default=False)
+    influencer = Column(Boolean, default=False)
     update_ts=Column(TIMESTAMP, onupdate=func.now())
 
-class DeviceId(Base):
-    __tablename__="deviceids"
+class Votes(Base):
+    __tablename__="votes"
     id = Column(Integer, primary_key=True, autoincrement=True)
     influencer_id=Column(Integer,ForeignKey(Influencers.id))
     device_id = Column(String, default=None, unique=True)
-    up=Column(Boolean,default="False")
-    down=Column(Boolean,default="False")
+    up = Column(Boolean, default=False)
+    down = Column(Boolean, default=False)
 
 
 
