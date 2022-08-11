@@ -321,7 +321,7 @@ async def profile(slug: str, db: Session = Depends(get_db)):
 async def related(db: Session = Depends(get_db)):
     # res = {}
     res="""
-    SELECT i.full_name,i.id,a.founder,a.investor,a.whale,a.influencer,
+    SELECT i.full_name,i.id,i.slug,a.founder,a.investor,a.whale,a.influencer,
     SUM(case when up then 1 else 0 END) as up,SUM(case when down then 1 else 0 END) as down
     FROM influencers i
     inner join achievements as a ON a.influencer_id=i.id 
