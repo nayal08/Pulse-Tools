@@ -176,7 +176,25 @@ async def createreactions(reaction:schemas.ReactionCreate,db:Session=Depends(get
                     Reactions.super_duper:reaction.super_duper
                     }
                 db.query(Reactions).filter(Reactions.device_id == reaction.device_id).update(update_data)
-                return jsonify_res(success=True, message="reactions Upvaded!")
+                db.commit()
+                reactions=db.query(Reactions).filter(Reactions.device_id == reaction.device_id).first()
+                data=jsonable_encoder(reactions)
+                influencer_id = data["influencer_id"]
+
+                res="""
+                select SUM(case when super_duper then 1 else 0 END) as count_super_duper,SUM(case when smiley then 1 else 0 END) as count_smiley,
+                SUM(case when heart then 1 else 0 END) as count_heart,SUM(case when dislike then 1 else 0 END) as count_dislike FROM reactions r where r.influencer_id={};
+                """.format(influencer_id)
+                
+                df = pd.read_sql(res, engine)
+                reaction_data = df.to_dict('records')
+
+                reactions = db.query(Reactions).with_entities(Reactions.dislike,Reactions.heart,Reactions.smiley,
+                Reactions.super_duper).filter(Reactions.device_id == reaction.device_id).first()
+                reaction_status=jsonable_encoder(reactions)
+
+                data={"reactions_count":reaction_data,"reaction_status":reaction_status}
+                return jsonify_res(success=True, message="reactions Upvaded!",data=data)
             else:
                 data = jsonable_encoder(influencer_data)
                 dbreactions=Reactions(
@@ -189,7 +207,28 @@ async def createreactions(reaction:schemas.ReactionCreate,db:Session=Depends(get
                 )
                 db.add(dbreactions)
                 db.commit()
-                return jsonify_res(success=True, message="reactions created!")
+                reactions = db.query(Reactions).filter(Reactions.device_id == reaction.device_id).first()
+                data = jsonable_encoder(reactions)
+                influencer_id = data["influencer_id"]
+                res = """
+                select SUM(case when super_duper then 1 else 0 END) as count_super_duper,SUM(case when smiley then 1 else 0 END) as count_smiley,
+                SUM(case when heart then 1 else 0 END) as count_heart,SUM(case when dislike then 1 else 0 END) as count_dislike FROM reactions r where r.influencer_id={};
+                """.format(influencer_id)
+
+                df = pd.read_sql(res, engine)
+                reaction_data = df.to_dict('records')
+
+                reactions = db.query(Reactions).with_entities(
+                    Reactions.dislike,
+                    Reactions.heart,
+                    Reactions.smiley,
+                    Reactions.super_duper
+                     ).filter(Reactions.device_id == reaction.device_id).first()
+
+                reaction_status = jsonable_encoder(reactions)
+                data = {"reactions_count": reaction_data,"reaction_status": reaction_status}
+                return jsonify_res(success=True, message="reactions created!",data=data)
+
         else:
             return jsonify_res(message="No influencer account associated with given slug")
     except:
