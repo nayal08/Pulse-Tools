@@ -306,8 +306,10 @@ async def profile(slug: str, db: Session = Depends(get_db)):
                 Achievements.investor,
                 Achievements.founder,
                 Achievements.whale,
+                Influencers.slug,
                 Achievements.influencer,
-                Influencers.bio).filter(
+                Influencers.bio,
+                ).filter(
                     Achievements.influencer_id == Influencers.id, 
                     Influencers.id == influencer_data["id"], 
                     SocialLinks.influencer_id == Influencers.id).all()
