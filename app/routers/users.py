@@ -295,7 +295,8 @@ async def profile(slug: str, db: Session = Depends(get_db)):
         influencer_data=jsonable_encoder(influencer)
         achievement = db.query(Achievements).filter(Achievements.influencer_id ==influencer_data["id"]).all()
         if achievement:
-            check=db.query(Achievements,Influencers,SocialLinks).with_entities(Influencers.full_name,
+            check=db.query(Achievements,Influencers,SocialLinks).with_entities(
+                Influencers.full_name,
                 Influencers.rating,
                 SocialLinks.website,
                 SocialLinks.twitter,
@@ -306,7 +307,10 @@ async def profile(slug: str, db: Session = Depends(get_db)):
                 Achievements.founder,
                 Achievements.whale,
                 Achievements.influencer,
-                Influencers.bio).filter(Achievements.influencer_id == Influencers.id,Influencers.id == influencer_data["id"]).all()
+                Influencers.bio).filter(
+                    Achievements.influencer_id == Influencers.id, 
+                    Influencers.id == influencer_data["id"], 
+                    SocialLinks.influencer_id == Influencers.id).all()
         if influencer and achievement:
             return jsonify_res(success=True,data=jsonable_encoder(check))
         elif influencer:
@@ -332,7 +336,6 @@ async def related(db: Session = Depends(get_db)):
     df = pd.read_sql(res, engine)
     data = df.to_dict('records')
     return jsonify_res(success=True,data=data)
-
 
 
 
