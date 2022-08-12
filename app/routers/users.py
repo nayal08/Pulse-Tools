@@ -293,7 +293,7 @@ async def profile(slug: str, db: Session = Depends(get_db)):
     influencer = db.query(Influencers).filter(Influencers.slug ==slug).first()
     if influencer:
         influencer_data=jsonable_encoder(influencer)
-        achievement = db.query(Achievements).filter(Achievements.influencer_id ==influencer_data["id"]).all()
+        achievement = db.query(Achievements).filter(Achievements.influencer_id ==influencer_data["id"]).first()
         if achievement:
             check=db.query(Achievements,Influencers,SocialLinks).with_entities(
                 Influencers.full_name,
