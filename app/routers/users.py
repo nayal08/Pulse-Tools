@@ -238,17 +238,17 @@ async def createreactions(reaction:schemas.ReactionCreate,db:Session=Depends(get
         print(exc_type, fname, exc_obj, exc_tb.tb_lineno)
 
 @router.get("/get-reactions")
-async def getreactions(slug: str,device_id:str, db: Session = Depends(get_db)):
+async def getreactions(slug: str, db: Session = Depends(get_db)):
     influencer_data = db.query(Influencers).filter(Influencers.slug == slug).first()
     if influencer_data:
         data = jsonable_encoder(influencer_data)
-        influencer_id = data["influencer_id"]
+        influencer_id = data["id"]
         # reactions = db.query(Reactions).filter(Reactions.influencer_id == influencer_id).first()
         res = """
                 select SUM(case when super_duper then 1 else 0 END) as count_super_duper,SUM(case when smiley then 1 else 0 END) as count_smiley,
                 SUM(case when heart then 1 else 0 END) as count_heart,SUM(case when dislike then 1 else 0 END) as count_dislike FROM reactions r where r.influencer_id={};
                 """.format(influencer_id)
-                
+
         df = pd.read_sql(res, engine)
         reaction_data = df.to_dict('records')
         return jsonify_res(success=True, data=reaction_data)
