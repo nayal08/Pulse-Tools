@@ -24,6 +24,7 @@ from app.schemas import *
 from app.models import *
 import uuid
 
+
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Influencer >>>>>>>>>>>>>>>>>>>>>>>>>
 
 @router.post("/create-influencer")
@@ -194,7 +195,7 @@ async def createreactions(reaction:schemas.ReactionCreate,db:Session=Depends(get
                 reaction_status=jsonable_encoder(reactions)
 
                 data={"reactions_count":reaction_data,"reaction_status":reaction_status}
-                return jsonify_res(success=True, message="reactions Upvaded!",data=data)
+                return jsonify_res(success=True, message="reactions Updated!",data=data)
             else:
                 data = jsonable_encoder(influencer_data)
                 dbreactions=Reactions(
@@ -237,13 +238,22 @@ async def createreactions(reaction:schemas.ReactionCreate,db:Session=Depends(get
         print(exc_type, fname, exc_obj, exc_tb.tb_lineno)
 
 @router.get("/get-reactions")
-async def getreactions(slug: str, db: Session = Depends(get_db)):
-    q=db.query(Reactions).filter(Reactions.influencer_id==slug).all()
-    if q:
-        data=jsonable_encoder(q)
-        return jsonify_res(success=True, data=data)
+async def getreactions(slug: str,device_id:str, db: Session = Depends(get_db)):
+    influencer_data = db.query(Influencers).filter(Influencers.slug == slug).first()
+    if influencer_data:
+        data = jsonable_encoder(influencer_data)
+        influencer_id = data["influencer_id"]
+        # reactions = db.query(Reactions).filter(Reactions.influencer_id == influencer_id).first()
+        res = """
+                select SUM(case when super_duper then 1 else 0 END) as count_super_duper,SUM(case when smiley then 1 else 0 END) as count_smiley,
+                SUM(case when heart then 1 else 0 END) as count_heart,SUM(case when dislike then 1 else 0 END) as count_dislike FROM reactions r where r.influencer_id={};
+                """.format(influencer_id)
+                
+        df = pd.read_sql(res, engine)
+        reaction_data = df.to_dict('records')
+        return jsonify_res(success=True, data=reaction_data)
     else:
-        return jsonify_res(success=False, message="no reactions available with given id")
+        return jsonify_res(success=False, message="No reactions available with given id")
 
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Achievements >>>>>>>>>>>>>>>>>>>>>>>>>>>>>.
 
@@ -267,7 +277,7 @@ async def createachievements(achievements:schemas.AchievementsCreate,db:Session=
                 )
                 db.add(dbachievements)
                 db.commit()
-                return jsonify_res(success=True, message="achievements created!")
+                return jsonify_res(success=True, message="Achievements created!")
         return jsonify_res(message="No influencer account associated with given slug")
     except:
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -284,7 +294,7 @@ async def getsociallinks(slug: str, db: Session = Depends(get_db)):
         achievement_data=jsonable_encoder(achievement)
         return jsonify_res(success=True, data=achievement_data)
     else:
-        return jsonify_res(message="no achievements available with given id")
+        return jsonify_res(message="No achievements available with given id")
 
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Votes >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
@@ -378,7 +388,67 @@ async def related(db: Session = Depends(get_db)):
     data = df.to_dict('records')
     return jsonify_res(success=True,data=data)
 
+@router.get("/populate-script")
+async def script(db: Session = Depends(get_db)):
+        f = open('app\routers\data.json')
+        data = json.load(f)
+        for i in data:
+            uid = str(uuid.uuid1())
+            dbcreateinfluencer = Influencers(full_name=i["Token_name"],
+                                            slug=uid,
+                                            youtube_link=i["Youtube_link"],
+                                            bio=i["Reputation"],
+                                            rating=round(
+                                                (int(i["PHL_Score"])/10), 1),
+                                            image=i["Token_Symbol"],
+                                            )
+            db.add(dbcreateinfluencer)
+            db.commit()
+            influencer_data = db.query(Influencers).filter(
+                Influencers.slug == uid).first()
+            if influencer_data:
+                iddata = jsonable_encoder(influencer_data)
+                twitter_v = ""
+                telegram_v = ""
+                youtube_v = ""
+                reddit_v = ""
+                discord_v = ""
+                medium_v = ""
+                instagram_v = ""
+                github_v = ""
 
+                print(len(i["Social_Links"]), type(len(i["Social_Links"])))
+                for j in range(len(i["Social_Links"])):
+                    if "twitter" in i["Social_Links"][j]:
+                        twitter_v = i["Social_Links"][j]
+                    if "https://t." in i["Social_Links"][j]:
+                        telegram_v = i["Social_Links"][j]
+                    if "https://youtube." in i["Social_Links"][j]:
+                        youtube_v = i["Social_Links"][j]
+                    if "https://reddit." in i["Social_Links"][j]:
+                        reddit_v = i["Social_Links"][j]
+                    if "https://discord." in i["Social_Links"][j]:
+                        discord_v = i["Social_Links"][j]
+                    if "https://medium." in i["Social_Links"][j]:
+                        medium_v = i["Social_Links"][j]
+                    if "https://instagram." in i["Social_Links"][j]:
+                        instagram_v = i["Social_Links"][j]
+                    if "https://github." in i["Social_Links"][j]:
+                        github_v = i["Social_Links"][j]
+
+                dbsocialmedia = SocialLinks(
+                    influencer_id=iddata["id"],
+                    telegram=telegram_v,
+                    twitter=twitter_v,
+                    github=github_v,
+                    discord=discord_v,
+                    instagram=instagram_v,
+                    medium=medium_v,
+                    youtube=youtube_v,
+                    reddit=reddit_v)
+                db.add(dbsocialmedia)
+                db.commit()
+        return "Completed!"
 
 
 
