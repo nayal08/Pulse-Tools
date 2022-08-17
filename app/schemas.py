@@ -1,3 +1,4 @@
+from lib2to3.pgen2.token import OP
 from typing import Optional
 from pydantic import BaseModel, Field, EmailStr
 
@@ -5,10 +6,12 @@ from pydantic import BaseModel, Field, EmailStr
 
 class InfluencerCreate(BaseModel):
     full_name:str
+    image: Optional[str]
     email:Optional[EmailStr]
     youtube_link:Optional[str]
     bio:Optional[str]
     rating:Optional[int]
+   
 
 class UpdateInfluencer(BaseModel):
     slug:str
@@ -23,9 +26,13 @@ class SocialMediaCreate(BaseModel):
     website:Optional[str]
     telegram:Optional[str]
     twitter:Optional[str]
+    youtube:Optional[str]
     github:Optional[str]
     unicrypt:Optional[str]
     discord:Optional[str]
+    medium:Optional[str]
+    reddit:Optional[str]
+    instagram:Optional[str]
 
 class ReactionCreate(BaseModel):
     slug:str

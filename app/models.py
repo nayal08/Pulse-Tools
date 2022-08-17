@@ -7,8 +7,6 @@ from sqlite3 import Timestamp
 from unicodedata import name
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, TIMESTAMP, DECIMAL, Date, BIGINT, Enum
 from sqlalchemy.sql import func
-from fastapi_utils.guid_type import GUID
-
 
 from .database import Base
 from datetime import datetime
@@ -21,6 +19,7 @@ class Influencers(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     slug=Column(String,unique=True,index=True)
     full_name=Column(String,default=None,unique=True,index=True)
+    image=Column(String,default=None,index=True)
     email=Column(String,default=None,index=True)
     rating=Column(Integer,default=None)
     youtube_link=Column(String,default=None)
@@ -35,10 +34,14 @@ class SocialLinks(Base):
     influencer_id=Column(Integer,ForeignKey(Influencers.id))
     website=Column(String, default=None)
     telegram=Column(String, default=None,unique=True)
+    youtube=Column(String,default=None)
     twitter=Column(String, default=None,unique=True)
     github=Column(String, default=None)
     unicrypt=Column(String,default=None)
     discord=Column(String,default=None)
+    reddit=Column(String,default=None)
+    instagram=Column(String,default=None)
+    medium = Column(String, default=None)
     update_ts=Column(TIMESTAMP, onupdate=func.now())
     
 

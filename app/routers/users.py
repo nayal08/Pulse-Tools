@@ -5,7 +5,7 @@ from sqlalchemy.sql import func
 from turtle import update
 from urllib import response
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Optional
+from typing import Optional, Tuple
 from ..commons.dependencies import *
 from .. import models, schemas
 from ..database import *
@@ -23,6 +23,7 @@ import sys
 from app.schemas import * 
 from app.models import *
 import uuid
+import tweepy as tw
 
 
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Influencer >>>>>>>>>>>>>>>>>>>>>>>>>
@@ -387,58 +388,57 @@ async def related(db: Session = Depends(get_db)):
     df = pd.read_sql(res, engine)
     data = df.to_dict('records')
     return jsonify_res(success=True,data=data)
-
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Populate script >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 @router.get("/populate-script")
 async def script(db: Session = Depends(get_db)):
-        f = open('app\routers\data.json')
+        f = open('app/routers/dbdata.json', encoding="utf8")
         data = json.load(f)
         for i in data:
             uid = str(uuid.uuid1())
             dbcreateinfluencer = Influencers(full_name=i["Token_name"],
                                             slug=uid,
                                             youtube_link=i["Youtube_link"],
-                                            bio=i["Reputation"],
-                                            rating=round(
-                                                (int(i["PHL_Score"])/10), 1),
+                                            bio=i["About"],
+                                            email="",
+                                            rating=round(int(i["PHL_Score"])/10),
                                             image=i["Token_Symbol"],
                                             )
             db.add(dbcreateinfluencer)
             db.commit()
             influencer_data = db.query(Influencers).filter(
                 Influencers.slug == uid).first()
+            iddata = jsonable_encoder(influencer_data)
             if influencer_data:
-                iddata = jsonable_encoder(influencer_data)
-                twitter_v = ""
-                telegram_v = ""
+                twitter_v = None
+                telegram_v = None
                 youtube_v = ""
                 reddit_v = ""
                 discord_v = ""
                 medium_v = ""
                 instagram_v = ""
                 github_v = ""
-
-                print(len(i["Social_Links"]), type(len(i["Social_Links"])))
                 for j in range(len(i["Social_Links"])):
                     if "twitter" in i["Social_Links"][j]:
                         twitter_v = i["Social_Links"][j]
-                    if "https://t." in i["Social_Links"][j]:
+                    elif "https://t." in i["Social_Links"][j]:
                         telegram_v = i["Social_Links"][j]
-                    if "https://youtube." in i["Social_Links"][j]:
+                    elif "https://youtube." in i["Social_Links"][j]:
                         youtube_v = i["Social_Links"][j]
-                    if "https://reddit." in i["Social_Links"][j]:
+                    elif "https://reddit." in i["Social_Links"][j]:
                         reddit_v = i["Social_Links"][j]
-                    if "https://discord." in i["Social_Links"][j]:
+                    elif "https://discord." in i["Social_Links"][j]:
                         discord_v = i["Social_Links"][j]
-                    if "https://medium." in i["Social_Links"][j]:
+                    elif "https://medium." in i["Social_Links"][j]:
                         medium_v = i["Social_Links"][j]
-                    if "https://instagram." in i["Social_Links"][j]:
+                    elif "https://instagram." in i["Social_Links"][j]:
                         instagram_v = i["Social_Links"][j]
-                    if "https://github." in i["Social_Links"][j]:
+                    elif "https://github." in i["Social_Links"][j]:
                         github_v = i["Social_Links"][j]
 
                 dbsocialmedia = SocialLinks(
                     influencer_id=iddata["id"],
                     telegram=telegram_v,
+                    website=i["Token_link"],
                     twitter=twitter_v,
                     github=github_v,
                     discord=discord_v,
@@ -448,9 +448,55 @@ async def script(db: Session = Depends(get_db)):
                     reddit=reddit_v)
                 db.add(dbsocialmedia)
                 db.commit()
+            whale=False
+            influencer=False
+            founder=False
+            investor=False
+            for j in range(len(i["Tags"])):
+                if i["Tags"][j] =="RH":
+                    founder=True
+                elif i["Tags"][j] =="HEX-related":
+                    whale=True
+                    influencer=True
+                elif i["Tags"][j] == "Airdrop":
+                    investor=True
+                elif i["Tags"][j] == "Sacrifice":
+                    investor=True
+                elif i["Tags"][j] == "App":
+                    founder=True
+                elif i["Tags"][j] == "RH":
+                    founder=True
+            achievements=Achievements(
+                influencer_id=iddata["id"],
+                founder=founder,
+                influencer=influencer,
+                whale=whale,
+                investor=investor
+                )
+            db.add(achievements)
+            db.commit()
         return "Completed!"
 
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< twitter api >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+@router.get("/tweepy")
+async def tweepy():
+    API_KEY = 'DEMAa5p579q9PpHZpauXWq5SR'
+    SECRET_KEY = 'OsfsofmkXXMLqyRSBnit7tsZthvNCYqxXikCuELdCgp4SwHl3X'
+    BEARER_TOKEN = 'AAAAAAAAAAAAAAAAAAAAAKIfgAEAAAAAMgk5eS%2FAwKqLy7CPjx8U26HsBoI%3DIKGae1NH1GJPhS23seWsFQXi3oz6RnDPPLH4zRoK8dMZiVpkEl'
+    ACCESS_TOKEN = '1559529911324667904-FH7EPVFPXlzGauC4CZrqaXUlZyIn23'
+    SECRET_TOKEN = 'pKPZqB0MeVWQnnpkImrswqdOMAbLGXxL1YJYQQqQZ2Q1b'
 
+    auth = tw.OAuthHandler(API_KEY, SECRET_KEY)
+    auth.set_access_token(ACCESS_TOKEN, SECRET_TOKEN)
+    api = tw.API(auth, wait_on_rate_limit=True) 
+    search_words = "#HEXcrypto -filter:retweets"
+
+    for tweet in tw.Cursor(api.search_words, tweet_mode='extended', q=search_words, lang="en").items():
+        print('Tweet Downloaded: ', counter)
+        print("#############",tweet.full_text)
+        counter += 1
+        if counter >= 10:
+            break
 
 
 
