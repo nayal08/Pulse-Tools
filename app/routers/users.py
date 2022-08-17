@@ -5,7 +5,7 @@ from sqlalchemy.sql import func
 from turtle import update
 from urllib import response
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Optional, Tuple
+from typing import Optional
 from ..commons.dependencies import *
 from .. import models, schemas
 from ..database import *
@@ -377,13 +377,13 @@ async def profile(slug: str, db: Session = Depends(get_db)):
 async def related(db: Session = Depends(get_db)):
     # res = {}
     res="""
-    SELECT i.full_name,i.id,i.slug,a.founder,a.investor,a.whale,a.influencer,
+    SELECT i.full_name,i.slug,a.founder,a.investor,a.whale,a.influencer,
     SUM(case when up then 1 else 0 END) as up,SUM(case when down then 1 else 0 END) as down
     FROM influencers i
     inner join achievements as a ON a.influencer_id=i.id 
-    inner join votes ON votes.influencer_id=i.id 
+    left join votes ON votes.influencer_id=i.id 
     WHERE a.influencer_id=i.id 
-    GROUP BY i.full_name,i.id,a.founder,a.investor,a.whale,a.influencer;
+    GROUP BY i.full_name,i.slug,a.founder,a.investor,a.whale,a.influencer;
     """
     df = pd.read_sql(res, engine)
     data = df.to_dict('records')
