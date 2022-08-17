@@ -347,6 +347,7 @@ async def profile(slug: str, db: Session = Depends(get_db)):
         if achievement:
             check=db.query(Achievements,Influencers,SocialLinks).with_entities(
                 Influencers.full_name,
+                Influencers.image,
                 Influencers.rating,
                 SocialLinks.website,
                 SocialLinks.twitter,
@@ -377,13 +378,13 @@ async def profile(slug: str, db: Session = Depends(get_db)):
 async def related(db: Session = Depends(get_db)):
     # res = {}
     res="""
-    SELECT i.full_name,i.slug,a.founder,a.investor,a.whale,a.influencer,
+    SELECT i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer,
     SUM(case when up then 1 else 0 END) as up,SUM(case when down then 1 else 0 END) as down
     FROM influencers i
     inner join achievements as a ON a.influencer_id=i.id 
     left join votes ON votes.influencer_id=i.id 
     WHERE a.influencer_id=i.id 
-    GROUP BY i.full_name,i.slug,a.founder,a.investor,a.whale,a.influencer;
+    GROUP BY i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer;
     """
     df = pd.read_sql(res, engine)
     data = df.to_dict('records')
