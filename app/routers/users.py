@@ -23,8 +23,6 @@ import sys
 from app.schemas import * 
 from app.models import *
 import uuid
-import tweepy as tw
-
 
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Influencer >>>>>>>>>>>>>>>>>>>>>>>>>
 
@@ -375,7 +373,7 @@ async def profile(slug: str, db: Session = Depends(get_db)):
     
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Community Ranking >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 @router.get("/community-ranking")
-async def related(db: Session = Depends(get_db)):
+async def related(page:int,page_size:int,db: Session = Depends(get_db)):
     # res = {}
     res="""
     SELECT i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer,
@@ -387,8 +385,25 @@ async def related(db: Session = Depends(get_db)):
     GROUP BY i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer;
     """
     df = pd.read_sql(res, engine)
-    data = df.to_dict('records')
-    return jsonify_res(success=True,data=data)
+    newdata = df.to_dict('records')
+    print(len(newdata))
+    countdata=page*page_size
+    initialpage=countdata-page_size
+    totaldatacount=len(newdata)
+    data = []
+    for currpage in range(int(len(newdata)/page_size)+2):
+        if page==0:
+            break
+        elif currpage==page:
+            if countdata>len(newdata):
+                data=newdata[initialpage:]
+                break
+            else:
+                data=newdata[initialpage:countdata]
+                break
+        else:
+            pass
+    return jsonify_res(success=True, data=data, totaldatacount=totaldatacount)
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Populate script >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 @router.get("/populate-script")
 async def script(db: Session = Depends(get_db)):
@@ -477,27 +492,6 @@ async def script(db: Session = Depends(get_db)):
             db.add(achievements)
             db.commit()
         return "Completed!"
-
-#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< twitter api >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-@router.get("/tweepy")
-async def tweepy():
-    API_KEY = 'DEMAa5p579q9PpHZpauXWq5SR'
-    SECRET_KEY = 'OsfsofmkXXMLqyRSBnit7tsZthvNCYqxXikCuELdCgp4SwHl3X'
-    BEARER_TOKEN = 'AAAAAAAAAAAAAAAAAAAAAKIfgAEAAAAAMgk5eS%2FAwKqLy7CPjx8U26HsBoI%3DIKGae1NH1GJPhS23seWsFQXi3oz6RnDPPLH4zRoK8dMZiVpkEl'
-    ACCESS_TOKEN = '1559529911324667904-FH7EPVFPXlzGauC4CZrqaXUlZyIn23'
-    SECRET_TOKEN = 'pKPZqB0MeVWQnnpkImrswqdOMAbLGXxL1YJYQQqQZ2Q1b'
-
-    auth = tw.OAuthHandler(API_KEY, SECRET_KEY)
-    auth.set_access_token(ACCESS_TOKEN, SECRET_TOKEN)
-    api = tw.API(auth, wait_on_rate_limit=True) 
-    search_words = "#HEXcrypto -filter:retweets"
-
-    for tweet in tw.Cursor(api.search_words, tweet_mode='extended', q=search_words, lang="en").items():
-        print('Tweet Downloaded: ', counter)
-        print("#############",tweet.full_text)
-        counter += 1
-        if counter >= 10:
-            break
 
 
 
