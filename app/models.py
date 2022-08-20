@@ -48,7 +48,7 @@ class SocialLinks(Base):
 class Reactions(Base):
     __tablename__="reactions"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    device_id = Column(String, default=None, unique=True)
+    device_id = Column(String, default=None)
     influencer_id=Column(Integer,ForeignKey(Influencers.id))
     super_duper=Column(Boolean,default=False)
     smiley=Column(Boolean,default=False)
@@ -70,7 +70,7 @@ class Votes(Base):
     __tablename__="votes"
     id = Column(Integer, primary_key=True, autoincrement=True)
     influencer_id=Column(Integer,ForeignKey(Influencers.id))
-    device_id = Column(String, default=None, unique=True)
+    device_id = Column(String, default=None)
     up = Column(Boolean, default=False)
     down = Column(Boolean, default=False)
 

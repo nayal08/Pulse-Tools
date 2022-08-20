@@ -166,8 +166,12 @@ async def updatesociallinks(links: schemas.SocialMediaCreate, db: Session = Depe
 async def createreactions(reaction:schemas.ReactionCreate,db:Session=Depends(get_db)):
     try:
         influencer_data = db.query(Influencers).filter(Influencers.slug == reaction.slug).first()
+        influencer_data = jsonable_encoder(influencer_data)
+
         if influencer_data:
-            device_id = db.query(Reactions).filter(Reactions.device_id == reaction.device_id).first()
+            device_id = db.query(Reactions).filter(
+                Reactions.device_id == reaction.device_id, Reactions.influencer_id == influencer_data["id"]).first()
+            devicedata=jsonable_encoder(device_id)
             if device_id: 
                 update_data={
                     Reactions.dislike:reaction.dislike,
@@ -175,22 +179,23 @@ async def createreactions(reaction:schemas.ReactionCreate,db:Session=Depends(get
                     Reactions.smiley:reaction.smiley,
                     Reactions.super_duper:reaction.super_duper
                     }
-                db.query(Reactions).filter(Reactions.device_id == reaction.device_id).update(update_data)
+                db.query(Reactions).filter(Reactions.device_id ==devicedata["device_id"],
+                                             Reactions.influencer_id == influencer_data["id"]).update(update_data)
                 db.commit()
-                reactions=db.query(Reactions).filter(Reactions.device_id == reaction.device_id).first()
-                data=jsonable_encoder(reactions)
-                influencer_id = data["influencer_id"]
 
                 res="""
                 select SUM(case when super_duper then 1 else 0 END) as count_super_duper,SUM(case when smiley then 1 else 0 END) as count_smiley,
                 SUM(case when heart then 1 else 0 END) as count_heart,SUM(case when dislike then 1 else 0 END) as count_dislike FROM reactions r where r.influencer_id={};
-                """.format(influencer_id)
+                """.format(influencer_data["id"])
                 
                 df = pd.read_sql(res, engine)
                 reaction_data = df.to_dict('records')
 
-                reactions = db.query(Reactions).with_entities(Reactions.dislike,Reactions.heart,Reactions.smiley,
-                Reactions.super_duper).filter(Reactions.device_id == reaction.device_id).first()
+                reactions = db.query(Reactions).with_entities(Reactions.dislike,
+                                                                Reactions.heart,
+                                                                Reactions.smiley,
+                                                                Reactions.super_duper
+                                                                ).filter(Reactions.device_id == reaction.device_id,Reactions.influencer_id==influencer_data["id"]).first()
                 reaction_status=jsonable_encoder(reactions)
 
                 data={"reactions_count":reaction_data,"reaction_status":reaction_status}
@@ -207,7 +212,8 @@ async def createreactions(reaction:schemas.ReactionCreate,db:Session=Depends(get
                 )
                 db.add(dbreactions)
                 db.commit()
-                reactions = db.query(Reactions).filter(Reactions.device_id == reaction.device_id).first()
+                db.refresh(dbreactions)
+                reactions = db.query(Reactions).filter(Reactions.influencer_id==data["id"]).first()
                 data = jsonable_encoder(reactions)
                 influencer_id = data["influencer_id"]
                 res = """
@@ -223,7 +229,7 @@ async def createreactions(reaction:schemas.ReactionCreate,db:Session=Depends(get
                     Reactions.heart,
                     Reactions.smiley,
                     Reactions.super_duper
-                     ).filter(Reactions.device_id == reaction.device_id).first()
+                ).filter(Reactions.device_id == reaction.device_id, Reactions.influencer_id == influencer_data["id"]).first()
 
                 reaction_status = jsonable_encoder(reactions)
                 data = {"reactions_count": reaction_data,"reaction_status": reaction_status}
@@ -302,11 +308,14 @@ async def createvotes(votes: schemas.VotesCreate, db: Session = Depends(get_db))
     influencer_data = db.query(Influencers).filter(Influencers.slug == votes.slug).first()
     if influencer_data:
         influencer_data = jsonable_encoder(influencer_data)
-        check_device = db.query(Votes).filter(Votes.device_id == votes.device_id).first()
+        print(influencer_data)
+        check_device = db.query(Votes).filter(
+            Votes.device_id == votes.device_id, Votes.influencer_id == influencer_data["id"]).first()
         if check_device:
             data={}
             updatedata={Votes.up:votes.up,Votes.down:votes.down}
-            db.query(Votes).filter(Votes.device_id==votes.device_id,Votes.influencer_id==influencer_data["id"]).update(updatedata)
+            db.query(Votes).filter(Votes.device_id == votes.device_id,
+                                   Votes.influencer_id == influencer_data["id"]).update(updatedata)
             db.commit()
             updata = db.query(Votes).filter(Votes.influencer_id == influencer_data["id"], Votes.up == True).count()
             downdata = db.query(Votes).filter(Votes.influencer_id == influencer_data["id"], Votes.down == True).count()
@@ -374,7 +383,6 @@ async def profile(slug: str, db: Session = Depends(get_db)):
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Community Ranking >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 @router.get("/community-ranking")
 async def related(page:int,page_size:int,db: Session = Depends(get_db)):
-    # res = {}
     res="""
     SELECT i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer,
     SUM(case when up then 1 else 0 END) as up,SUM(case when down then 1 else 0 END) as down
@@ -493,6 +501,26 @@ async def script(db: Session = Depends(get_db)):
             db.commit()
         return "Completed!"
 
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Search Community >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> 
+@router.get("/search-community")
+async def search(search:str):
+    try:
+        res="""
+        SELECT i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer,
+        SUM(case when up then 1 else 0 END) as up,SUM(case when down then 1 else 0 END) as down
+        FROM influencers i
+        inner join achievements as a ON a.influencer_id=i.id 
+        left join votes ON votes.influencer_id=i.id 
+        WHERE a.influencer_id=i.id and i.full_name ILIKE '{}%%'
+        GROUP BY i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer;
+        """.format(search)
+        df = pd.read_sql(res, engine)
+        search_data = df.to_dict('records')
+        print(search_data)
+        return jsonify_res(success=True, data=search_data)
+
+    except Exception as e:
+        return "None"
 
 
 
