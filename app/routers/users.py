@@ -308,7 +308,6 @@ async def createvotes(votes: schemas.VotesCreate, db: Session = Depends(get_db))
     influencer_data = db.query(Influencers).filter(Influencers.slug == votes.slug).first()
     if influencer_data:
         influencer_data = jsonable_encoder(influencer_data)
-        print(influencer_data)
         check_device = db.query(Votes).filter(
             Votes.device_id == votes.device_id, Votes.influencer_id == influencer_data["id"]).first()
         if check_device:
@@ -390,7 +389,8 @@ async def related(page:int,page_size:int,db: Session = Depends(get_db)):
     inner join achievements as a ON a.influencer_id=i.id 
     left join votes ON votes.influencer_id=i.id 
     WHERE a.influencer_id=i.id 
-    GROUP BY i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer;
+    GROUP BY i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer
+    ORDER BY up DESC;
     """
     df = pd.read_sql(res, engine)
     newdata = df.to_dict('records')
@@ -512,7 +512,8 @@ async def search(search:str):
         inner join achievements as a ON a.influencer_id=i.id 
         left join votes ON votes.influencer_id=i.id 
         WHERE a.influencer_id=i.id and i.full_name ILIKE '{}%%'
-        GROUP BY i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer;
+        GROUP BY i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer
+        ORDER BY up DESC;
         """.format(search)
         df = pd.read_sql(res, engine)
         search_data = df.to_dict('records')
