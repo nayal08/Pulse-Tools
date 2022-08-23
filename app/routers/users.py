@@ -1,7 +1,6 @@
 # from curses import flash
 from __future__ import with_statement
 from email import message
-from select import select
 from sqlalchemy.sql import func
 from turtle import update
 from urllib import response
@@ -564,8 +563,8 @@ async def twitter(slug: str, db: Session = Depends(get_db)):
             twitter["timestamp"] = datetime.timestamp()
             # twitter["author_id"] = tweet.id
             twitter["username"] = tweet.user.screen_name
-            twitter["profile picture"] = tweet.user.profile_image_url
-            
+            twitter["profile_picture"] = tweet.user.profile_image_url
+            twitter["name"]=tweet.user.name
             if 'media' in tweet.entities:
                 for image in tweet.entities['media']:
                     twitter["image"]=image['media_url']
