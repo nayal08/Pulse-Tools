@@ -1,6 +1,7 @@
 # from curses import flash
 from __future__ import with_statement
 from email import message
+from select import select
 from sqlalchemy.sql import func
 from turtle import update
 from urllib import response
@@ -23,7 +24,7 @@ import sys
 from app.schemas import * 
 from app.models import *
 import uuid
-
+import tweepy
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Influencer >>>>>>>>>>>>>>>>>>>>>>>>>
 
 @router.post("/create-influencer")
@@ -522,6 +523,59 @@ async def search(search:str):
 
     except Exception as e:
         return "None"
+
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Related >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+@router.get("/related")
+async def related(slug:str,db:Session = Depends(get_db)):
+    influencer = db.query(Influencers).filter(Influencers.slug == slug).first()
+    if influencer:
+        influencer_data = jsonable_encoder(influencer)
+        # achievement = db.query(Achievements).filter(Achievements.influencer_id == influencer_data["id"]).first()
+        
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< twitter >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+@router.get("/twitter")
+async def twitter(slug: str, db: Session = Depends(get_db)):
+    influencer = db.query(Influencers).filter(Influencers.slug == slug).first()
+    if influencer:
+        influencer_data = jsonable_encoder(influencer)
+        query = db.query(SocialLinks, Influencers).with_entities(SocialLinks.twitter).filter(SocialLinks.influencer_id == Influencers.id).filter(Influencers.slug == slug).first()
+        if query:
+            data=jsonable_encoder(query)
+            search_tweets = "#{} -filter:retweets".format(data["twitter"])
+        else:
+            search_tweets = "#{} -filter:retweets".format(influencer_data["full_name"])
+        consumer_key = "2XLb0P7DezFX5cZ0ooqr9fmZn"
+        consumer_secret = "vB5Vv0LPaaONNDVulvTTRDBW8XJUFfXsU2uJOMADGIRcgwf1GB"
+        access_token = "1506977322590629896-wlEMm8jCwc1C0CtUdbcW2hEGLSZ6FH"
+        access_token_secret = "I3Nd64N0LLp1SX7m74X9zfKQFTZT0LS7sDuX2ILGyDen5"
+        bearer_token = "AAAAAAAAAAAAAAAAAAAAAE5UdwEAAAAAKrq2GwEt9osEV3RmmQXwoHjgFfw%3DGtXEKq5eHBJ8v2vK1vift3hnESb0BjQ56vvLyuA4mgZb5kr6Qx"
+
+        auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+        auth.set_access_token(access_token, access_token_secret)
+        client = tweepy.Client(bearer_token, consumer_key,consumer_secret, access_token, access_token_secret)
+        api = tweepy.API(auth, wait_on_rate_limit=True)
+        search_tweets = "#HEXcrypto -filter:retweets"
+        list1=[]
+        for tweet in tweepy.Cursor(api.search_tweets, tweet_mode='extended', q=search_tweets, lang="en").items(100):
+            twitter={}
+            twitter["tweets"] = tweet.full_text
+            datetime = tweet.created_at
+            twitter["timestamp"] = datetime.timestamp()
+            # twitter["author_id"] = tweet.id
+            twitter["username"] = tweet.user.screen_name
+            twitter["profile picture"] = tweet.user.profile_image_url
+            
+            if 'media' in tweet.entities:
+                for image in tweet.entities['media']:
+                    twitter["image"]=image['media_url']
+                    
+            else:
+                twitter["image"]=None
+
+            list1.append(twitter)
+        return jsonify_res(success=True,data=list1)
+    return jsonify_res(message="No influencer associated with given slug")
 
 
 
