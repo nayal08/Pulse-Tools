@@ -55,3 +55,9 @@ class VotesCreate(BaseModel):
     up:bool
     down:bool
 
+
+class signature(BaseModel):
+    signature: str
+    wallet_address: str
+
+

@@ -24,6 +24,9 @@ from app.schemas import *
 from app.models import *
 import uuid
 import tweepy
+from web3.auto import w3
+from eth_account.messages import encode_defunct
+from hexbytes import HexBytes
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Influencer >>>>>>>>>>>>>>>>>>>>>>>>>
 
 @router.post("/create-influencer")
@@ -561,14 +564,12 @@ async def twitter(slug: str, db: Session = Depends(get_db)):
             twitter["tweets"] = tweet.full_text
             datetime = tweet.created_at
             twitter["timestamp"] = datetime.timestamp()
-            # twitter["author_id"] = tweet.id
             twitter["username"] = tweet.user.screen_name
             twitter["profile_picture"] = tweet.user.profile_image_url
             twitter["name"]=tweet.user.name
             if 'media' in tweet.entities:
                 for image in tweet.entities['media']:
                     twitter["image"]=image['media_url']
-                    
             else:
                 twitter["image"]=None
 
@@ -576,6 +577,46 @@ async def twitter(slug: str, db: Session = Depends(get_db)):
         return jsonify_res(success=True,data=list1)
     return jsonify_res(message="No influencer associated with given slug")
 
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Metamask Api >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+@router.get("/get-nonce")
+def nounce(ethwallet: str, db: Session = Depends(get_db)):
+    nonce = str(random.randint(1111, 9999))
+    ethwallet = ethwallet.lower()
+    checkethwallet = db.query(Metamaskusers).filter(Metamaskusers.ethwallet == ethwallet).first()
+    if checkethwallet:
+        updatedata = {'nonce': nonce}
+        db.query(Metamaskusers).filter(Metamaskusers.ethwallet == ethwallet).update(updatedata)
+        db.commit()
+    else:
+        db_user = Metamaskusers(ethwallet=ethwallet, nonce=nonce.lower())
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+    print(nonce, "nonce")
+    return jsonify_res(success=True, nonce=nonce)
+
+
+@router.post("/post-signature")
+def signature(credentials: schemas.signature, db: Session = Depends(get_db)):
+    wallet_address = credentials.wallet_address.lower()
+    signature_value = credentials.signature.lower()
+    checkethwallet = db.query(Metamaskusers).with_entities(Metamaskusers.nonce).filter(Metamaskusers.ethwallet == wallet_address).first()
+    if checkethwallet:
+        data = jsonable_encoder(checkethwallet)
+        nonce = data["nonce"]
+        message = encode_defunct(text=nonce)
+        address = w3.eth.account.recover_message(
+            message, signature=HexBytes(signature_value))
+        if address.lower() == wallet_address:
+            updatedata = {'nonce': ""}
+            db.query(Metamaskusers).filter(Metamaskusers.ethwallet ==wallet_address).update(updatedata)
+            db.commit()
+            return jsonify_res(success=True)
+        else:
+            return jsonify_res(success=False)
+    return "No account availlable"
 
 
 

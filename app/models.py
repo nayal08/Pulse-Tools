@@ -74,7 +74,14 @@ class Votes(Base):
     up = Column(Boolean, default=False)
     down = Column(Boolean, default=False)
 
-
+class Metamaskusers (Base):
+    __tablename__ = "metamaskusers"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, default=None)
+    ethwallet = Column(String, unique=True, index=True, nullable=False)
+    nonce = Column(String, unique=False, nullable=False)
+    updated_at = Column(TIMESTAMP, onupdate=func.now())
+    created_at = Column(TIMESTAMP, server_default=func.now())
 
 
 
