@@ -2,8 +2,10 @@
 import email
 from email.policy import default
 from enum import unique
+from itertools import chain
 from operator import index
 from sqlite3 import Timestamp
+from tkinter.messagebox import NO
 from unicodedata import name
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, TIMESTAMP, DECIMAL, Date, BIGINT, Enum
 from sqlalchemy.sql import func
@@ -82,6 +84,14 @@ class Metamaskusers (Base):
     nonce = Column(String, unique=False, nullable=False)
     updated_at = Column(TIMESTAMP, onupdate=func.now())
     created_at = Column(TIMESTAMP, server_default=func.now())
+
+class favouritecoins(Base):
+    id = Column(Integer, primary_key=True, index=True)
+    user_id=Column(Integer,ForeignKey(Metamaskusers.id))
+    pair=Column(String,default=None)
+    chain=Column(String,default=None)
+    update_ts = Column(TIMESTAMP, onupdate=func.now())
+    
 
 
 

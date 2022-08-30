@@ -1,5 +1,6 @@
 # from curses import flash
 from __future__ import with_statement
+import requests
 from email import message
 from sqlalchemy.sql import func
 from turtle import update
@@ -600,9 +601,10 @@ def nounce(ethwallet: str, db: Session = Depends(get_db)):
 
 @router.post("/post-signature")
 def signature(credentials: schemas.signature, db: Session = Depends(get_db)):
+    secret = "B6YX6ZMK6JCFNDPRELYQWFJUUJYCP6QL"
     wallet_address = credentials.wallet_address.lower()
     signature_value = credentials.signature.lower()
-    checkethwallet = db.query(Metamaskusers).with_entities(Metamaskusers.nonce).filter(Metamaskusers.ethwallet == wallet_address).first()
+    checkethwallet = db.query(Metamaskusers).with_entities(Metamaskusers.nonce,Metamaskusers.id).filter(Metamaskusers.ethwallet == wallet_address).first()
     if checkethwallet:
         data = jsonable_encoder(checkethwallet)
         nonce = data["nonce"]
@@ -613,12 +615,27 @@ def signature(credentials: schemas.signature, db: Session = Depends(get_db)):
             updatedata = {'nonce': ""}
             db.query(Metamaskusers).filter(Metamaskusers.ethwallet ==wallet_address).update(updatedata)
             db.commit()
-            return jsonify_res(success=True)
+            access_token=jwt.encode({
+                "exp": datetime.utcnow()+60,
+                "iat": datetime.utcnow(),
+                "user_id":data["id"]
+            }, secret, algorithm="HS256")
+            return jsonify_res(success=True,access_token=access_token)
         else:
             return jsonify_res(success=False)
     return "No account availlable"
 
 
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< pair id Data >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+@router.post("/pairid-data")
+def pairid(pairs:dict=None, db: Session = Depends(get_db)):
+    API_ENDPOINT = "https://investdex.io/dexvision/all-chains-api/favorite_pairs_all"
+    r = requests.post(url=API_ENDPOINT, json=pairs)
+    return jsonify_res(success=True,data=r.json())
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Add pair id >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# @router.post("/add-pairid")
+# def addpairid(signature: str, db: Session = Depends(get_db)):
 
 
