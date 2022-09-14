@@ -632,8 +632,11 @@ def signature(credentials: schemas.signature, db: Session = Depends(get_db)):
 def pairid(pairs:dict=None, db: Session = Depends(get_db)):
     API_ENDPOINT = "https://investdex.io/dexvision/all-chains-api/favorite_pairs_all"
     r = requests.post(url=API_ENDPOINT, json=pairs)
+    print(r.status_code)
+    #if r.status_code == 200:
+        #return response.json()
+    #return False
     return jsonify_res(success=True,data=json.loads(r.text))
-
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Add pair id >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # @router.post("/add-pairid")
 # def addpairid(signature: str, db: Session = Depends(get_db)):
