@@ -1,6 +1,10 @@
 # from curses import flash
 from __future__ import with_statement
 import requests
+from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi.responses import JSONResponse
+from fastapi_jwt_auth import AuthJWT
+from fastapi_jwt_auth.exceptions import AuthJWTException
 from email import message
 from sqlalchemy.sql import func
 from turtle import update
@@ -392,7 +396,7 @@ async def related(page:int,page_size:int,db: Session = Depends(get_db)):
     FROM influencers i
     inner join achievements as a ON a.influencer_id=i.id 
     left join votes ON votes.influencer_id=i.id 
-    WHERE a.influencer_id=i.id 
+    WHERE a.influencer_id=i.id
     GROUP BY i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer
     ORDER BY up DESC;
     """
@@ -530,11 +534,42 @@ async def search(search:str):
 
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Related >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 @router.get("/related")
-async def related(slug:str,db:Session = Depends(get_db)):
+async def related(page:int,page_size:int,slug:str,db:Session = Depends(get_db)):
     influencer = db.query(Influencers).filter(Influencers.slug == slug).first()
     if influencer:
         influencer_data = jsonable_encoder(influencer)
-        # achievement = db.query(Achievements).filter(Achievements.influencer_id == influencer_data["id"]).first()
+        achievement = db.query(Achievements).filter(Achievements.influencer_id == influencer_data["id"]).first()
+        achievement_data=jsonable_encoder(achievement)
+        res = """
+                SELECT i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer,
+                SUM(case when up then 1 else 0 END) as up,SUM(case when down then 1 else 0 END) as down
+                FROM influencers i
+                inner join achievements as a ON a.influencer_id=i.id 
+                left join votes ON votes.influencer_id=i.id 
+                WHERE a.influencer_id != {} and (a.influencer={} or a.investor={} or a.founder={} or a.whale={})
+                GROUP BY i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer
+                ORDER BY up DESC;
+                """.format(influencer_data["id"], achievement_data["influencer"], achievement_data["investor"], achievement_data["founder"], achievement_data["whale"])
+        df = pd.read_sql(res, engine)
+        newdata = df.to_dict('records')
+        print(len(newdata))
+        countdata = page*page_size
+        initialpage = countdata-page_size
+        totaldatacount = len(newdata)
+        data = []
+        for currpage in range(int(len(newdata)/page_size)+2):
+            if page == 0:
+                break
+            elif currpage == page:
+                if countdata > len(newdata):
+                    data = newdata[initialpage:]
+                    break
+                else:
+                    data = newdata[initialpage:countdata]
+                    break
+            else:
+                pass
+        return jsonify_res(success=True, data=data, totaldatacount=totaldatacount)
         
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< twitter >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 @router.get("/twitter")
@@ -599,9 +634,23 @@ def nounce(ethwallet: str, db: Session = Depends(get_db)):
     return jsonify_res(success=True, nonce=nonce)
 
 
+class Settings(BaseModel):
+    authjwt_secret_key: str = "B6YX6ZMK6JCFNDPRELYQWFJUUJYCP6QL"
+
+@AuthJWT.load_config
+def get_config():
+    return Settings()
+
+
+# @router.exception_handler(AuthJWTException)
+# def authjwt_exception_handler(request: Request, exc: AuthJWTException):
+#     return JSONResponse(
+#         status_code=exc.status_code,
+#         content={"detail": exc.message}
+#     )
+
 @router.post("/post-signature")
-def signature(credentials: schemas.signature, db: Session = Depends(get_db)):
-    secret = "B6YX6ZMK6JCFNDPRELYQWFJUUJYCP6QL"
+def signature(credentials: schemas.Signature, db: Session = Depends(get_db), Authorize: AuthJWT = Depends()):
     wallet_address = credentials.wallet_address.lower()
     signature_value = credentials.signature.lower()
     checkethwallet = db.query(Metamaskusers).with_entities(Metamaskusers.nonce,Metamaskusers.id).filter(Metamaskusers.ethwallet == wallet_address).first()
@@ -611,34 +660,112 @@ def signature(credentials: schemas.signature, db: Session = Depends(get_db)):
         message = encode_defunct(text=nonce)
         address = w3.eth.account.recover_message(
             message, signature=HexBytes(signature_value))
+        print(address.lower())
+        print(wallet_address)
         if address.lower() == wallet_address:
             updatedata = {'nonce': ""}
             db.query(Metamaskusers).filter(Metamaskusers.ethwallet ==wallet_address).update(updatedata)
             db.commit()
-            access_token=jwt.encode({
-                "exp": datetime.utcnow()+60,
-                "iat": datetime.utcnow(),
-                "user_id":data["id"]
-            }, secret, algorithm="HS256")
-            return jsonify_res(success=True,access_token=access_token)
+            access_token = Authorize.create_access_token(subject=data["id"], fresh=True)
+            refresh_token = Authorize.create_refresh_token(subject=data["id"])
+            jwt_tokens = {"access_token": access_token,
+                          "refresh_token": refresh_token}
+            return jsonify_res(success=True, jwt_token=jwt_tokens)
         else:
-            return jsonify_res(success=False)
+            raise HTTPException(status_code=401, detail="Bad request")
     return "No account availlable"
 
 
+@router.post('/refresh')
+def refresh(Authorize: AuthJWT = Depends()):
+    """
+    Refresh token endpoint. This will generate a new access token from
+    the refresh token, but will mark that access token as non-fresh,
+    as we do not actually verify a password in this endpoint.
+    """
+    Authorize.jwt_refresh_token_required()
+
+    current_user = Authorize.get_jwt_subject()
+    new_access_token = Authorize.create_access_token(
+        subject=current_user, fresh=False)
+    return {"access_token": new_access_token}
+
+@router.post('/my-ethwallet')
+def ethwallet(Authorize: AuthJWT = Depends(), db: Session = Depends(get_db)):
+    Authorize.jwt_required()
+    user_id = str(Authorize.get_jwt_subject())
+    print(user_id)
+    getethwallet= db.query(Metamaskusers).with_entities(Metamaskusers.ethwallet).filter(Metamaskusers.id==user_id).first()
+    if getethwallet:
+        data = jsonable_encoder(getethwallet)
+        print(data["ethwallet"])
+        return jsonify_res(success=True,ethwallet=data)
+    return jsonify_res(success=False)
+
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< pair id Data >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+# @router.post("/pairid-data")
+# def pairid(pairs:dict=None, db: Session = Depends(get_db)):
+#     API_ENDPOINT = "https://investdex.io/dexvision/all-chains-api/favorite_pairs_all"
+#     i=0
+#     data=[]
+#     print(pairs['pairs'],"@@@@@@@@@@",type(pairs['pairs']))
+#     print(len(pairs['pairs']))
+#     while i <len(pairs['pairs']):
+#         print(pairs['pairs'][i],"#######")
+#         value = pairs['pairs'][i]
+#         r = requests.post(url=API_ENDPOINT,json=value)
+#         print(r)
+#         # print(json.loads(r.text))
+#         data.append(json.loads(r.text))
+#     return jsonify_res(success=True,data=data)
+
+
 @router.post("/pairid-data")
-def pairid(pairs:dict=None, db: Session = Depends(get_db)):
+def pairid(pairs: dict = None, db: Session = Depends(get_db)):
     API_ENDPOINT = "https://investdex.io/dexvision/all-chains-api/favorite_pairs_all"
     r = requests.post(url=API_ENDPOINT, json=pairs)
     print(r.status_code)
-    #if r.status_code == 200:
-        #return response.json()
-    #return False
     return jsonify_res(success=True,data=json.loads(r.text))
-#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Add pair id >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-# @router.post("/add-pairid")
-# def addpairid(signature: str, db: Session = Depends(get_db)):
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Add and remove pair id >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+@router.post("/add-chain-pairid")
+def addpairid(Addfavourte: schemas.Addfavourte,Authorize: AuthJWT = Depends(), db: Session = Depends(get_db)):
+    Authorize.jwt_required()
+    user_id = str(Authorize.get_jwt_subject())
+    i=0
+    # print(Addfavourte.favourites)
+    while i< len(Addfavourte.favourites):
+        print(Addfavourte.favourites[i].pair)
+        user = db.query(Favouritecoins).filter(Favouritecoins.user_id == user_id).filter(
+            Favouritecoins.pair == Addfavourte.favourites[i].pair, Favouritecoins.chain == Addfavourte.favourites[i].chain).first()
+        if user:
+            updatefavourite = {"pair": Addfavourte.favourites[i].pair, "chain": Addfavourte.favourites[i].chain}
+            db.query(Favouritecoins).filter(Favouritecoins.user_id == user_id).filter(Favouritecoins.pair == Addfavourte.favourites[i].pair, Favouritecoins.chain == Addfavourte.favourites[i].chain).update(updatefavourite)
+            db.commit()
+        else:
+            dbcreatefavourite = Favouritecoins(pair=Addfavourte.favourites[i].pair,
+                                            chain=Addfavourte.favourites[i].chain,
+                                                user_id=user_id,
+                                            )
+            db.add(dbcreatefavourite)
+            db.commit()
+        i+=1
+    return jsonify_res(success=True, message="Added favourite chain pair successfully")
 
 
+@router.post("/remove-chain-pairid")
+def addpairid(Addfavourte: schemas.Addfavourte, Authorize: AuthJWT = Depends(), db: Session = Depends(get_db)):
+    Authorize.jwt_required()
+    user_id = str(Authorize.get_jwt_subject())
+    i=0
+    while i < len(Addfavourte.favourites):
+        print(Addfavourte.favourites[i].pair)
+        userfav = db.query(Favouritecoins).filter(Favouritecoins.user_id == user_id).filter(
+            Favouritecoins.pair == Addfavourte.favourites[i].pair, Favouritecoins.chain == Addfavourte.favourites[i].chain).first()
+        if userfav:
+            db.delete(userfav)
+            db.commit()
+            db.close()
+        i+=1
+    return jsonify_res(success=True, message="Favoutite deleted")

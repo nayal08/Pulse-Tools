@@ -1,5 +1,5 @@
 from lib2to3.pgen2.token import OP
-from typing import Optional
+from typing import List, Optional,Dict,Union
 from pydantic import BaseModel, Field, EmailStr
 
 ##############################################################################################################
@@ -56,8 +56,38 @@ class VotesCreate(BaseModel):
     down:bool
 
 
-class signature(BaseModel):
+class Signature(BaseModel):
     signature: str
     wallet_address: str
+
+
+class pairs(BaseModel):
+    pair:str
+    chain:str
+
+class Addfavourte(BaseModel):
+    favourites:List[pairs]
+
+class AddProject(BaseModel):
+    name:str
+    userid:int
+    token_symbol:str
+    sub_heading:str
+    about:str
+    image:str
+
+class Projectfilters(BaseModel):
+    filters:List[dict]
+
+class User():
+    name:str
+    type:str
+
+
+
+
+
+
+
 
 
