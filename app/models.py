@@ -85,13 +85,81 @@ class Metamaskusers (Base):
     updated_at = Column(TIMESTAMP, onupdate=func.now())
     created_at = Column(TIMESTAMP, server_default=func.now())
 
-class favouritecoins(Base):
+class Favouritecoins(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id=Column(Integer,ForeignKey(Metamaskusers.id))
     pair=Column(String,default=None)
     chain=Column(String,default=None)
     update_ts = Column(TIMESTAMP, onupdate=func.now())
-    
+
+
+class User(Base):
+    id = Column(Integer, primary_key=True,index=True)
+    name = Column(String, default=None)
+    type= Column(String,default=None)
+
+class Project(Base):
+    id = Column(Integer, primary_key=True,index=True)
+    userid = Column(Integer, ForeignKey(User.id))
+    verify= Column(Boolean,default=False)
+    slug = Column(String, unique=True, index=True)
+    about=Column(String,default=None)
+    name=Column(String,default=None)
+    token_symbol=Column(String,default=None)
+    sub_heading=Column(String,default=None)
+    image=Column(String,default=None)
+    add_ts = Column(TIMESTAMP, server_default=func.now())
+    update_ts = Column(TIMESTAMP, onupdate=func.now())
+
+class ProjectSocial(Base):
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    project_id = Column(Integer, ForeignKey(Project.id))
+    website = Column(String, default=None)
+    telegram = Column(String, default=None)
+    youtube = Column(String, default=None)
+    twitter = Column(String, default=None)
+    github = Column(String, default=None)
+    discord = Column(String, default=None)
+    medium = Column(String, default=None)
+    update_ts = Column(TIMESTAMP, onupdate=func.now())
+
+class ProjectType(Base):
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    project_id = Column(Integer, ForeignKey(Project.id))
+    type = Column(String, default=None)
+
+class ProjectSubType(Base):
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    project_type = Column(Integer, ForeignKey(ProjectType.id))
+    subtype = Column(String, default=None)
+
+class ProjectChain(Base):
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    project_id = Column(Integer, ForeignKey(Project.id))
+    chain = Column(String, default=None)
+    token_address = Column(String, default=None)
+
+class ProjectStats(Base):
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    project_stat = Column(Integer, ForeignKey(Project.id))
+    circulating_supply=Column(Integer,default=None)
+    volume=Column(Integer,default=None)
+    market_cap = Column(Integer, default=None)
+    price = Column(Integer, default=None)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

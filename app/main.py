@@ -1,12 +1,13 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-
+from app.models import *
+import uuid
+import json
 import sys
 from app.core.config import settings
-from app.routers import users
+from app.routers import users,projects
 from app import models, schemas
 from app.database import SessionLocal, engine
-
 
 def get_application():
     _app = FastAPI(title=settings.PROJECT_NAME)
@@ -27,4 +28,6 @@ app = get_application()
 models.Base.metadata.create_all(bind=engine)
 
 app.include_router(users.router,prefix="/api")
+app.include_router(projects.router,prefix="/projects")
 
+data =[]
