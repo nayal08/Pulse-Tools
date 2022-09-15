@@ -91,25 +91,21 @@ async def createlinks(links:schemas.SocialMediaCreate,db:Session=Depends(get_db)
     try:
         telegram_link = links.telegram
         twitter_link = links.twitter
-        influencer_data = db.query(Influencers).filter(Influencers.slug == links.slug).first()
-        if influencer_data:
+        check = db.query(SocialLinks, Influencers).filter(SocialLinks.influencer_id==Influencers.id).filter(Influencers.slug==links.slug).with_entities(SocialLinks.discord,SocialLinks.influencer_id,SocialLinks.telegram,SocialLinks.twitter,Influencers.slug).all()
+        if len(check)!=0:
+            return jsonify_res(success=False, message="Social media links already present for given id")
+        else:
+            check_twitter = db.query(SocialLinks).filter(SocialLinks.twitter == twitter_link).all()
+            check_telegram = db.query(SocialLinks).filter(SocialLinks.telegram == telegram_link).all()
+            influencer_data = db.query(Influencers).filter(Influencers.slug == links.slug).first()
             data=jsonable_encoder(influencer_data)
-            social_info = db.query(SocialLinks).filter(SocialLinks.influencer_id == data["id"]).first()
-            if social_info:
-                return jsonify_res(success=False, message="Social media links already present for given id")
-
-            else:
-                check_twitter = db.query(SocialLinks).filter(SocialLinks.twitter == twitter_link).all()
-                check_telegram = db.query(SocialLinks).filter(SocialLinks.telegram == telegram_link).all()
-                influencer_data = db.query(Influencers).filter(Influencers.slug == links.slug).first()
-                data=jsonable_encoder(influencer_data)
-                if check_twitter and check_telegram:
-                    return jsonify_res(message="Twitter and Telegram links already present, it must be unique")
-                elif check_twitter:
-                    return jsonify_res( message="Twitter link already present, it must be unique")
-                elif check_telegram:    
-                    return jsonify_res(message="Telegram link already present, it must be unique")
-
+            if check_twitter and check_telegram:
+                return jsonify_res(message="Twitter and Telegram links already present, it must be unique")
+            elif check_twitter:
+                return jsonify_res( message="Twitter link already present, it must be unique")
+            elif check_telegram:    
+                return jsonify_res(message="Telegram link already present, it must be unique")
+            if data:
                 created_at = datetime.now()
                 dbsocialmedia=SocialLinks(
                     influencer_id=data["id"],
@@ -360,20 +356,20 @@ async def profile(slug: str, db: Session = Depends(get_db)):
         achievement = db.query(Achievements).filter(Achievements.influencer_id ==influencer_data["id"]).first()
         if achievement:
             check=db.query(Achievements,Influencers,SocialLinks).with_entities(
-                Influencers.full_name,
-                Influencers.image,
-                Influencers.rating,
-                SocialLinks.website,
-                SocialLinks.twitter,
-                SocialLinks.telegram,
-                SocialLinks.github,
-                SocialLinks.discord,
-                Achievements.investor,
-                Achievements.founder,
-                Achievements.whale,
-                Influencers.slug,
-                Achievements.influencer,
-                Influencers.bio,
+            Influencers.full_name,
+            Influencers.image,
+            Influencers.rating,
+            SocialLinks.website,
+            SocialLinks.twitter,
+            SocialLinks.telegram,
+            SocialLinks.github,
+            SocialLinks.discord,
+            Achievements.investor,
+            Achievements.founder,
+            Achievements.whale,
+            Influencers.slug,
+            Achievements.influencer,
+            Influencers.bio,
                 ).filter(
                     Achievements.influencer_id == Influencers.id, 
                     Influencers.id == influencer_data["id"], 
@@ -390,6 +386,10 @@ async def profile(slug: str, db: Session = Depends(get_db)):
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Community Ranking >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 @router.get("/community-ranking")
 async def related(page:int,page_size:int,db: Session = Depends(get_db)):
+    page=page
+    limit=page_size
+    offset=((limit*page)-limit)
+    print(limit,offset)
     res="""
     SELECT i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer,
     SUM(case when up then 1 else 0 END) as up,SUM(case when down then 1 else 0 END) as down
@@ -398,28 +398,12 @@ async def related(page:int,page_size:int,db: Session = Depends(get_db)):
     left join votes ON votes.influencer_id=i.id 
     WHERE a.influencer_id=i.id
     GROUP BY i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer
-    ORDER BY up DESC;
-    """
+    ORDER BY up DESC
+    LIMIT {} OFFSET {};
+    """.format(limit,offset)
     df = pd.read_sql(res, engine)
     newdata = df.to_dict('records')
-    print(len(newdata))
-    countdata=page*page_size
-    initialpage=countdata-page_size
-    totaldatacount=len(newdata)
-    data = []
-    for currpage in range(int(len(newdata)/page_size)+2):
-        if page==0:
-            break
-        elif currpage==page:
-            if countdata>len(newdata):
-                data=newdata[initialpage:]
-                break
-            else:
-                data=newdata[initialpage:countdata]
-                break
-        else:
-            pass
-    return jsonify_res(success=True, data=data, totaldatacount=totaldatacount)
+    return jsonify_res(success=True, data=newdata)
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Populate script >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 @router.get("/populate-script")
 async def script(db: Session = Depends(get_db)):
@@ -540,6 +524,10 @@ async def related(page:int,page_size:int,slug:str,db:Session = Depends(get_db)):
         influencer_data = jsonable_encoder(influencer)
         achievement = db.query(Achievements).filter(Achievements.influencer_id == influencer_data["id"]).first()
         achievement_data=jsonable_encoder(achievement)
+        page = page
+        limit = page_size
+        offset = ((limit*page)-limit)
+        print(limit, offset)
         res = """
                 SELECT i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer,
                 SUM(case when up then 1 else 0 END) as up,SUM(case when down then 1 else 0 END) as down
@@ -548,28 +536,12 @@ async def related(page:int,page_size:int,slug:str,db:Session = Depends(get_db)):
                 left join votes ON votes.influencer_id=i.id 
                 WHERE a.influencer_id != {} and (a.influencer={} or a.investor={} or a.founder={} or a.whale={})
                 GROUP BY i.full_name,i.slug,i.image,a.founder,a.investor,a.whale,a.influencer
-                ORDER BY up DESC;
-                """.format(influencer_data["id"], achievement_data["influencer"], achievement_data["investor"], achievement_data["founder"], achievement_data["whale"])
+                ORDER BY up DESC
+                LIMIT {} OFFSET {};
+                """.format(influencer_data["id"], achievement_data["influencer"], achievement_data["investor"], achievement_data["founder"], achievement_data["whale"],limit,offset)
         df = pd.read_sql(res, engine)
         newdata = df.to_dict('records')
-        print(len(newdata))
-        countdata = page*page_size
-        initialpage = countdata-page_size
-        totaldatacount = len(newdata)
-        data = []
-        for currpage in range(int(len(newdata)/page_size)+2):
-            if page == 0:
-                break
-            elif currpage == page:
-                if countdata > len(newdata):
-                    data = newdata[initialpage:]
-                    break
-                else:
-                    data = newdata[initialpage:countdata]
-                    break
-            else:
-                pass
-        return jsonify_res(success=True, data=data, totaldatacount=totaldatacount)
+        return jsonify_res(success=True, data=newdata)
         
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< twitter >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 @router.get("/twitter")
@@ -769,3 +741,31 @@ def addpairid(Addfavourte: schemas.Addfavourte, Authorize: AuthJWT = Depends(), 
             db.close()
         i+=1
     return jsonify_res(success=True, message="Favoutite deleted")
+
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< For Web only >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+@router.get("/influencer-profiles")
+async def profile(page:int,page_size:int,db: Session = Depends(get_db)):
+    page = page
+    limit = page_size
+    offset = ((limit*page)-limit)
+    print(limit, offset)
+    check = db.query(Achievements, Influencers, SocialLinks).with_entities(
+                Influencers.full_name,
+                Influencers.image,
+                Influencers.rating,
+                SocialLinks.website,
+                SocialLinks.twitter,
+                SocialLinks.telegram,
+                SocialLinks.github,
+                SocialLinks.discord,
+                Achievements.investor,
+                Achievements.founder,
+                Achievements.whale,
+                Influencers.slug,
+                Achievements.influencer,
+                Influencers.bio,
+            ).filter(
+                Achievements.influencer_id == Influencers.id,
+                SocialLinks.influencer_id == Influencers.id).order_by(Influencers.rating.desc()).limit(limit).offset(offset).all()
+    print(len(jsonable_encoder(check)))
+    return jsonify_res(success=True, data=jsonable_encoder(check))

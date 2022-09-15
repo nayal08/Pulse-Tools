@@ -92,15 +92,8 @@ class Favouritecoins(Base):
     chain=Column(String,default=None)
     update_ts = Column(TIMESTAMP, onupdate=func.now())
 
-
-class User(Base):
-    id = Column(Integer, primary_key=True,index=True)
-    name = Column(String, default=None)
-    type= Column(String,default=None)
-
 class Project(Base):
     id = Column(Integer, primary_key=True,index=True)
-    userid = Column(Integer, ForeignKey(User.id))
     verify= Column(Boolean,default=False)
     slug = Column(String, unique=True, index=True)
     about=Column(String,default=None)
@@ -147,8 +140,14 @@ class ProjectStats(Base):
     market_cap = Column(Integer, default=None)
     price = Column(Integer, default=None)
 
-
-
+class ProjectLikes(Base):
+    __tablename__ = "projectlikes"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(Integer, ForeignKey(Influencers.id))
+    like = Column(Boolean, default=False)
+    dislike = Column(Boolean, default=False)
+    user_wallet = Column(String, ForeignKey(Metamaskusers.ethwallet))
+    
 
 
 

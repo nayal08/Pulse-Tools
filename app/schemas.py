@@ -1,4 +1,5 @@
 from lib2to3.pgen2.token import OP
+from turtle import st
 from typing import List, Optional,Dict,Union
 from pydantic import BaseModel, Field, EmailStr
 
@@ -79,9 +80,13 @@ class AddProject(BaseModel):
 class Projectfilters(BaseModel):
     filters:List[dict]
 
-class User():
-    name:str
-    type:str
+class Projectslikes(BaseModel):
+    project_slug:str
+    like:bool
+    dislike:bool
+    wallet:str
+
+
 
 
 
