@@ -247,7 +247,7 @@ async def createreactions(reaction:schemas.ReactionCreate,db:Session=Depends(get
         print(exc_type, fname, exc_obj, exc_tb.tb_lineno)
 
 @router.get("/get-reactions")
-async def getreactions(slug: str, db: Session = Depends(get_db)):
+async def getreactions(slug: str,device_id:str, db: Session = Depends(get_db)):
     influencer_data = db.query(Influencers).filter(Influencers.slug == slug).first()
     if influencer_data:
         data = jsonable_encoder(influencer_data)
@@ -260,7 +260,16 @@ async def getreactions(slug: str, db: Session = Depends(get_db)):
 
         df = pd.read_sql(res, engine)
         reaction_data = df.to_dict('records')
-        return jsonify_res(success=True, data=reaction_data)
+        reactions = db.query(Reactions).with_entities(Reactions.dislike,
+                                                      Reactions.heart,
+                                                      Reactions.smiley,
+                                                      Reactions.super_duper
+                                                      ).filter(Reactions.device_id == device_id, Reactions.influencer_id == data["id"]).first()
+        reaction_status = jsonable_encoder(reactions)
+
+        data = {"reactions_count": reaction_data,
+                "reaction_status": reaction_status}
+        return jsonify_res(success=True, data=data)
     else:
         return jsonify_res(success=False, message="No reactions available with given id")
 
