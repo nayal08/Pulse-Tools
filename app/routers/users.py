@@ -1,5 +1,10 @@
 # from curses import flash
 from __future__ import with_statement
+from queue import Empty
+import ssl
+from operator import itemgetter
+from dateutil import parser
+import feedparser
 import requests
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
@@ -32,6 +37,12 @@ import tweepy
 from web3.auto import w3
 from eth_account.messages import encode_defunct
 from hexbytes import HexBytes
+
+# USERS_REDIS_HOST = os.getenv("PULSETOOLS_REDIS_HOST")
+
+USERS_REDIS_HOST = os.getenv("PULSETOOLS_REDIS_HOST")
+USERPOOL = redis.ConnectionPool(host=USERS_REDIS_HOST, port=6379, db=0, decode_responses=True)
+redisClient = redis.StrictRedis(connection_pool=USERPOOL, decode_responses=True)
 #<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Influencer >>>>>>>>>>>>>>>>>>>>>>>>>
 
 @router.post("/create-influencer")
@@ -778,3 +789,58 @@ async def profile(page:int,page_size:int,db: Session = Depends(get_db)):
                 SocialLinks.influencer_id == Influencers.id).order_by(Influencers.rating.desc()).limit(limit).offset(offset).all()
     print(len(jsonable_encoder(check)))
     return jsonify_res(success=True, data=jsonable_encoder(check))
+
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Lates news and feeds >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+@router.get("/feeds")
+async def getfeeds():
+    data = redisClient.get("posts_feed_details")
+    if(data is not None):
+        print('data from redis')
+        data = json.loads(data)
+        return data
+    else:
+        print('data from feeds')
+        post_list = []
+        urls = ["https://cointelegraph.com/rss", "https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml", "https://pulse-chain.com/feed/",
+                ]
+        
+        for feed_url in urls:
+            if hasattr(ssl, '_create_unverified_context'):
+                ssl._create_default_https_context = ssl._create_unverified_context
+            blog_feed = feedparser.parse(feed_url)
+            # getting lists of blog entries via .entries
+            posts = blog_feed.entries
+            # dictionary for holding posts details
+            posts_details = {}
+
+            
+            # iterating over individual posts
+            for post in posts:
+                temp = dict()
+                # return post
+                # if any post doesn't have information then throw error.
+                try:
+                    temp["title"] = post["title"]
+                    temp["link"] = post["link"]
+                    temp["description"] = post.description
+                    strtime = post["published"]
+                    epoch = parser.parse(strtime).timestamp()
+                    temp["date"] = epoch
+                    temp["images"] = post["media_content"][0]["url"]
+                except:
+                    pass
+
+                post_list.append(temp)
+
+        post_lists = sorted(post_list, key=itemgetter('date'), reverse=True)
+        # storing lists of posts in the dictionary
+        posts_details["posts"] = post_lists
+        redisClient.setex("posts_feed_details",600, json.dumps(
+            {"posts_details": posts_details}))
+        # returning the details which is dictionary
+        #posts_details
+        return posts_details
+
+
+
