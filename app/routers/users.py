@@ -821,6 +821,7 @@ async def getfeeds():
                 # return post
                 # if any post doesn't have information then throw error.
                 try:
+                    temp["coin_name"] = blog_feed.feed.title
                     temp["title"] = post["title"]
                     temp["link"] = post["link"]
                     temp["description"] = post.description
