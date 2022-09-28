@@ -2,6 +2,8 @@
 from __future__ import with_statement
 from queue import Empty
 import ssl
+import requests
+import asyncpraw
 from operator import itemgetter
 from dateutil import parser
 import feedparser
@@ -842,6 +844,41 @@ async def getfeeds():
         # returning the details which is dictionary
         #posts_details
         return posts_details
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< reddit hots >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+@router.get("/reddit-hots")
+async def getreddithot():
+    secret_key = 'IbrzQqRtuinpidPJmFKN7UyB0bIxGA'
+    client_id = 'J2cEKnj2ZrX-m5GcTyfp8w'
+    reddit = asyncpraw.Reddit(
+        client_id=client_id, client_secret=secret_key, user_agent='Pulsechain')
+
+    posts_details={}
+    posts=[]
+    pulsechain_subreddit = await reddit.subreddit('Pulsechain')
+    async for post in pulsechain_subreddit.hot(limit=30):
+        dict = {}
+        dict["title"]=post.title
+        dict["url"] = "https://www.reddit.com"+post.permalink
+        if (".jpg" in post.url) or (".png" in post.url):
+            dict["image"]=post.url
+        else:
+            dict["image"]=""
+        dict["body"]=post.selftext
+        dict["created"]=post.created
+
+        dict["author"]=str(post.author)
+        posts.append(dict)
+    post_lists = sorted(posts, key=itemgetter('created'), reverse=True)
+    posts_details["posts"] = post_lists
+    print(posts)
+    return posts_details
+
+
+
+
+
 
 
 
