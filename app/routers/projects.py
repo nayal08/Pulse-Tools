@@ -19,9 +19,10 @@ from app.models import *
 import uuid
 import sys
 
+
+
 @router.post("/add-project")
 async def addProject(addproject:schemas.AddProject,db: Session = Depends(get_db)):
-    print(addproject.userid, type(addproject.userid))
     try:
         AddProject = Project(   slug=str(uuid.uuid1()),
                                 name= addproject.name,
@@ -47,6 +48,11 @@ async def getProjects(slug: str, db: Session = Depends(get_db)):
         return jsonify_res(success=True, Influencers=data)
     else:
         return jsonify_res(success=False,Influencers="no project available with given slug")
+
+@router.delete("/delete-project")
+async def deleteproject(slug: str, db: Session = Depends(get_db)):
+    project_delete=db.query()
+
 
 @router.get("/project-search")
 async def getallProjects(name: str, db: Session = Depends(get_db)):
@@ -98,7 +104,50 @@ async def getallfilter(db: Session = Depends(get_db)):
             Project.name, Project.sub_heading, Project.token_symbol, Project.image, ProjectType.type, ProjectSubType.subtype, Project.slug, ProjectSocial.website).all()
     return projects   
 
+@router.post("/project-likes")
+async def projectlikes(projectlikes:schemas.Projectslikes,db: Session = Depends(get_db)):
+    project = db.query(Project, Projectslikes).filter(ProjectLikes.project_id==Project.id).filter(Project.slug==projectlikes.user_slug).all()
+    project_info = db.query(Project).filter(Project.slug==projectlikes.project_slug).first()
+    projectinfo=jsonable_encoder(project_info)
+
+    if len(project)!=0:
+        updatedata={ProjectLikes.like:projectlikes.like,ProjectLikes.dislike:projectlikes.dislike}
+        db.query(ProjectLikes).filter(ProjectLikes.project_id == projectinfo["id"]).update(updatedata)
+        db.commit()
+        likes = db.query(ProjectLikes).filter(ProjectLikes.project_id == projectinfo["id"], projectlikes.like == True).count()
+        dislike = db.query(ProjectLikes).filter(ProjectLikes.project_id == projectinfo["id"], projectlikes.like == False).count()
+        data = {}
+        data["updata"] = likes
+        data["downdata"] = dislike
+        data["like"] = projectlikes.like
+        data["dislike"] = projectlikes.dislike
+        return jsonify_res(success=True, message="Updated!", data=data)
+
+    else:
+        create_likes=ProjectLikes(
+                                        project_id=projectinfo["id"],
+                                        like=projectlikes.like,
+                                        dislike=projectlikes.dislike,
+                                        user_wallet=projectlikes.wallet
+                                    )
+        db.add(create_likes)
+        db.commit()
+        likes=db.query(ProjectLikes).filter(ProjectLikes.project_id==projectinfo["id"],projectlikes.like==True).count()
+        dislike = db.query(ProjectLikes).filter(
+            ProjectLikes.project_id == projectinfo["id"], projectlikes.like == False).count()
+        data={}
+        data["updata"] = likes
+        data["downdata"] = dislike
+        data["like"] = projectlikes.like
+        data["dislike"] = projectlikes.dislike
+        return jsonify_res(success=True, message="votes created!", data=data)
         
+
+
+
+
+
+
 
 
 
